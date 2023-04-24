@@ -1,7 +1,7 @@
 import {Entity, model, property} from '@loopback/repository';
 
 @model()
-export class Guardar extends Entity {
+export class RolMenu extends Entity {
   @property({
     type: 'string',
     id: true,
@@ -39,14 +39,23 @@ export class Guardar extends Entity {
   })
   descargar: boolean;
 
+  @property({
+    type: 'string',
+  })
+  rolId?: string;
 
-  constructor(data?: Partial<Guardar>) {
+  @property({
+    type: 'string',
+  })
+  menuId?: string;
+
+  constructor(data?: Partial<RolMenu>) {
     super(data);
   }
 }
 
-export interface GuardarRelations {
+export interface RolMenuRelations {
   // describe navigational properties here
 }
 
-export type GuardarWithRelations = Guardar & GuardarRelations;
+export type RolMenuWithRelations = RolMenu & RolMenuRelations;
