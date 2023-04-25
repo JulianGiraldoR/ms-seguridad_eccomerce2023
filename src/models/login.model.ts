@@ -14,7 +14,7 @@ export class Login extends Entity {
     type: 'string',
     required: true,
   })
-  codigo: string;
+  codigo2fa: string;
 
   @property({
     type: 'string',
@@ -24,9 +24,9 @@ export class Login extends Entity {
 
   @property({
     type: 'string',
-    required: true,
+    
   })
-  token: string;
+  token?: string;
 
   @property({
     type: 'boolean',
