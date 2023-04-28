@@ -22,6 +22,8 @@ import {Credenciales, FactorDeAutenticacionPorCodigo, Login, Usuario} from '../m
 import {LoginRepository, UsuarioRepository} from '../repositories';
 import { SeguridadUsuarioService } from '../services';
 import { service } from '@loopback/core';
+import { authenticate } from '@loopback/authentication';
+import { ConfiguracionSeguridad } from '../config/seguridad.config';
 
 export class UsuarioController {
   constructor(
@@ -75,6 +77,10 @@ export class UsuarioController {
     return this.usuarioRepository.count(where);
   }
 
+  @authenticate({
+    strategy:"auth",
+    options:[ConfiguracionSeguridad.menuUsuarioId, ConfiguracionSeguridad.listarAccion]
+  })
   @get('/usuario')
   @response(200, {
     description: 'Array of Usuario model instances',
@@ -176,6 +182,40 @@ export class UsuarioController {
     content:{'application/json':{schema:getModelSchemaRef(Usuario)}}
   })
   async identificarUsuario(
+    @requestBody(
+      {
+        content:{
+          'application/json':{
+            schema: getModelSchemaRef(Credenciales)
+          }
+        }
+      }
+      )
+      credenciales: Credenciales
+  ): Promise<object> {
+    let usuario = await this.servicioSeguridad.identificarUsuario(credenciales);
+    if (usuario) {
+      let codigo2fa = this.servicioSeguridad.crearTextoAleatorio(5);
+      let login:Login = new Login();
+      login.usuarioId = usuario._id!;
+      login.codigo2fa = codigo2fa;
+      login.estadoCodigo2fa =false;
+      login.token = "";
+      login.estadoToken = false;
+      this.repositorioLogin.create(login);
+      usuario.clave = "";
+      //notificar al usuario via correo o sms
+      return usuario;
+    }
+    return new HttpErrors[401]("credenciales incorrectras.");
+  }
+
+  @post('/validar-permisos')
+  @response(200,{
+    description:"validacion de permisos de usuario para logica de megocio",
+    content:{'application/json':{schema:getModelSchemaRef(Usuario)}}
+  })
+  async ValidarPermisosDeUsuario(
     @requestBody(
       {
         content:{
