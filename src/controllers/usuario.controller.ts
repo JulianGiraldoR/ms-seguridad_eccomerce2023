@@ -20,10 +20,11 @@ import {
 } from '@loopback/rest';
 import {Credenciales, FactorDeAutenticacionPorCodigo, Login, Usuario} from '../models';
 import {LoginRepository, UsuarioRepository} from '../repositories';
-import { SeguridadUsuarioService } from '../services';
+import { AuthService, NotificacionesService, SeguridadUsuarioService } from '../services';
 import { service } from '@loopback/core';
 import { authenticate } from '@loopback/authentication';
 import { ConfiguracionSeguridad } from '../config/seguridad.config';
+import { ConfiguracionNotificacion } from '../config/notificaciones.config';
 
 export class UsuarioController {
   constructor(
@@ -32,7 +33,11 @@ export class UsuarioController {
     @service(SeguridadUsuarioService)
     public servicioSeguridad: SeguridadUsuarioService,
     @repository(LoginRepository)
-    public repositorioLogin: LoginRepository
+    public repositorioLogin: LoginRepository,
+    @service(AuthService)
+    private servicioAuth: AuthService,
+    @service(NotificacionesService)
+    public servicioNotificaciones:NotificacionesService,
   ) {}
 
   @post('/usuario')
@@ -177,37 +182,46 @@ export class UsuarioController {
    */
 
   @post('/identificar-usuario')
-  @response(200,{
-    description:"identificar un usuario por correo y clave",
-    content:{'application/json':{schema:getModelSchemaRef(Usuario)}}
+  @response(200, {
+    description: "Identificar un usuario por correo y clave",
+    content: {'application/json': {schema: getModelSchemaRef(Usuario)}}
   })
   async identificarUsuario(
     @requestBody(
       {
-        content:{
-          'application/json':{
+        content: {
+          'application/json': {
             schema: getModelSchemaRef(Credenciales)
           }
         }
       }
-      )
-      credenciales: Credenciales
+    )
+    credenciales: Credenciales
   ): Promise<object> {
     let usuario = await this.servicioSeguridad.identificarUsuario(credenciales);
     if (usuario) {
       let codigo2fa = this.servicioSeguridad.crearTextoAleatorio(5);
-      let login:Login = new Login();
+      console.log(codigo2fa);
+      let login: Login = new Login();
       login.usuarioId = usuario._id!;
       login.codigo2fa = codigo2fa;
-      login.estadoCodigo2fa =false;
+      login.estadoCodigo2fa = false;
       login.token = "";
       login.estadoToken = false;
       this.repositorioLogin.create(login);
       usuario.clave = "";
-      //notificar al usuario via correo o sms
+      // notificar al usuario vía correo o sms
+      let datos = {
+        correoDestino: usuario.correo,
+        nombreDestino: usuario.primerNombre + " " + usuario.segundoNombre,
+        contenidoCorreo: `Su código de segundo factor de autenticación es: ${codigo2fa}`,
+        asuntoCorreo: ConfiguracionNotificacion.asunto2fa,
+      };
+      let url = ConfiguracionNotificacion.urlNotificaciones2fa;
+      this.servicioNotificaciones.EnviarCorreoElectronio(datos, url);
       return usuario;
     }
-    return new HttpErrors[401]("credenciales incorrectras.");
+    return new HttpErrors[401]("Credenciales incorrectas.");
   }
 
   @post('/validar-permisos')
