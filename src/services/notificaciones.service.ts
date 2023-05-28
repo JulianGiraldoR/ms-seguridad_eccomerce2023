@@ -8,7 +8,7 @@ export class NotificacionesService {
   /*
    * Add service methods here
    */
-  EnviarCorreoElectronio(datos:any, url:string){
+  EnviarNotificacion(datos:any, url:string){
     fetch(url,{
       method:'post',
       body: JSON.stringify(datos),

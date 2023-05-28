@@ -18,7 +18,7 @@ import {
   response,
   HttpErrors,
 } from '@loopback/rest';
-import {Credenciales, FactorDeAutenticacionPorCodigo, Login, Usuario} from '../models';
+import {Credenciales, CredencialesRecuperarClave, FactorDeAutenticacionPorCodigo, Login, Usuario} from '../models';
 import {LoginRepository, UsuarioRepository} from '../repositories';
 import { AuthService, NotificacionesService, SeguridadUsuarioService } from '../services';
 import { service } from '@loopback/core';
@@ -218,7 +218,52 @@ export class UsuarioController {
         asuntoCorreo: ConfiguracionNotificacion.asunto2fa,
       };
       let url = ConfiguracionNotificacion.urlNotificaciones2fa;
-      this.servicioNotificaciones.EnviarCorreoElectronio(datos, url);
+      this.servicioNotificaciones.EnviarNotificacion(datos, url);
+      return usuario;
+    }
+    return new HttpErrors[401]("Credenciales incorrectas.");
+  }
+
+  @post('/recuperar-clave')
+  @response(200, {
+    description: "Identificar un usuario por correo y clave",
+    content: {'application/json': {schema: getModelSchemaRef(Usuario)}}
+  })
+  async RecuperarClaveUsuario(
+    @requestBody(
+      {
+        content: {
+          'application/json': {
+            schema: getModelSchemaRef(CredencialesRecuperarClave)
+          }
+        }
+      }
+    )
+    credenciales: CredencialesRecuperarClave
+  ): Promise<object> {
+    let usuario = await this.usuarioRepository.findOne({
+      where:{
+        correo:credenciales.correo
+      }
+    });
+    if (usuario) {
+      let nuevaClave = this.servicioSeguridad.crearTextoAleatorio(5);
+      console.log(nuevaClave);
+      let claveCifrada = this.servicioSeguridad.cifrarTexto(nuevaClave);
+      usuario.clave = claveCifrada;
+      this.usuarioRepository.updateById(usuario._id,usuario);
+
+
+
+      // notificar al usuario vía correo o sms
+      let datos = {
+        correoDestino: usuario.correo,
+        nombreDestino: usuario.primerNombre + " " + usuario.segundoNombre,
+        contenidoCorreo: `Hola ${usuario.primerNombre}, su nueva clave es : ${nuevaClave}`,
+        asuntoCorreo: ConfiguracionNotificacion.asunto2fa,
+      };
+      let url = ConfiguracionNotificacion.urlNotificaciones2fa;
+      this.servicioNotificaciones.EnviarNotificacion(datos, url);
       return usuario;
     }
     return new HttpErrors[401]("Credenciales incorrectas.");
